@@ -423,3 +423,472 @@ local FloatingBall = criar("TextButton", {
 arredondar(FloatingBall, 25)
 gradiente(FloatingBall, CONFIG.COR_PRIMARIA, CONFIG.COR_SECUNDARIA, 45)
 sombra(FloatingBall)
+--// SISTEMA DE PÁGINAS
+local Pages = {}
+local CurrentPage = nil
+local SidebarButtons = {}
+
+local function criarCategoria(nome, icone)
+    local btn = criar("TextButton", {
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = CONFIG.COR_PAINEL,
+        BackgroundTransparency = 0.15,
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+        Parent = Sidebar,
+        ZIndex = 6,
+    })
+    arredondar(btn, 6)
+
+    local iconLabel = criar("TextLabel", {
+        Size = UDim2.new(0, 24, 1, 0),
+        Position = UDim2.new(0, 6, 0, 0),
+        BackgroundTransparency = 1,
+        Text = icone or "▸",
+        TextColor3 = CONFIG.COR_PRIMARIA,
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 14,
+        Parent = btn,
+        ZIndex = 7,
+    })
+    local nameLabel = criar("TextLabel", {
+        Size = UDim2.new(1, -30, 1, 0),
+        Position = UDim2.new(0, 30, 0, 0),
+        BackgroundTransparency = 1,
+        Text = nome,
+        TextColor3 = CONFIG.COR_TEXTO,
+        Font = CONFIG.FONTE,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = btn,
+        ZIndex = 7,
+    })
+
+    local page = criar("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+        Visible = false,
+        Parent = ContentScroll,
+        ZIndex = 7,
+    })
+    criar("UIListLayout", {
+        Padding = UDim.new(0, 6),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = page,
+    })
+
+    Pages[nome] = page
+    SidebarButtons[nome] = { btn = btn, icon = iconLabel, label = nameLabel }
+
+    btn.MouseEnter:Connect(function()
+        if CurrentPage ~= nome then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.COR_SIDEBAR}):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        if CurrentPage ~= nome then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.COR_PAINEL}):Play()
+        end
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        for n, p in pairs(Pages) do p.Visible = false end
+        for n, b in pairs(SidebarButtons) do
+            TweenService:Create(b.btn, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.COR_PAINEL}):Play()
+            b.icon.TextColor3 = CONFIG.COR_PRIMARIA
+            b.label.TextColor3 = CONFIG.COR_TEXTO
+        end
+        Pages[nome].Visible = true
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.COR_PRIMARIA}):Play()
+        iconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        pageTitle.Text = nome
+        CurrentPage = nome
+    end)
+
+    return page
+end
+
+--// FUNÇÃO TOGGLE
+local function criarToggle(parent, nome, descricao, callback)
+    local container = criar("Frame", {
+        Size = UDim2.new(1, -6, 0, 46),
+        BackgroundColor3 = CONFIG.COR_PAINEL,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0,
+        LayoutOrder = #parent:GetChildren(),
+        Parent = parent,
+        ZIndex = 7,
+    })
+    arredondar(container, 8)
+    criar("UIStroke", {
+        Color = CONFIG.COR_PRIMARIA,
+        Thickness = 1,
+        Transparency = 0.85,
+        Parent = container,
+    })
+
+    criar("TextLabel", {
+        Size = UDim2.new(0.7, 0, 0, 20),
+        Position = UDim2.new(0, 12, 0, 6),
+        BackgroundTransparency = 1,
+        Text = nome,
+        TextColor3 = CONFIG.COR_TEXTO,
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = container,
+        ZIndex = 8,
+    })
+    if descricao then
+        criar("TextLabel", {
+            Size = UDim2.new(0.7, 0, 0, 16),
+            Position = UDim2.new(0, 12, 0, 24),
+            BackgroundTransparency = 1,
+            Text = descricao,
+            TextColor3 = CONFIG.COR_SUBTEXTO,
+            Font = CONFIG.FONTE,
+            TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = container,
+            ZIndex = 8,
+        })
+    end
+
+    local toggleBg = criar("Frame", {
+        Size = UDim2.new(0, 40, 0, 20),
+        Position = UDim2.new(1, -52, 0.5, -10),
+        BackgroundColor3 = Color3.fromRGB(60, 55, 75),
+        BorderSizePixel = 0,
+        Parent = container,
+        ZIndex = 8,
+    })
+    arredondar(toggleBg, 10)
+
+    local circle = criar("Frame", {
+        Size = UDim2.new(0, 16, 0, 16),
+        Position = UDim2.new(0, 2, 0.5, -8),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+        Parent = toggleBg,
+        ZIndex = 9,
+    })
+    arredondar(circle, 8)
+
+    local ativo = false
+    local btn = criar("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        Parent = container,
+        ZIndex = 9,
+    })
+
+    btn.MouseButton1Click:Connect(function()
+        ativo = not ativo
+        if ativo then
+            TweenService:Create(toggleBg, TweenInfo.new(0.2), {BackgroundColor3 = CONFIG.COR_PRIMARIA}):Play()
+            TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
+        else
+            TweenService:Create(toggleBg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 55, 75)}):Play()
+            TweenService:Create(circle, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -8)}):Play()
+        end
+        if callback then callback(ativo) end
+    end)
+
+    return container
+end
+
+--// FUNÇÃO SLIDER
+local function criarSlider(parent, nome, min, max, padrao, callback)
+    local container = criar("Frame", {
+        Size = UDim2.new(1, -6, 0, 50),
+        BackgroundColor3 = CONFIG.COR_PAINEL,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0,
+        LayoutOrder = #parent:GetChildren(),
+        Parent = parent,
+        ZIndex = 7,
+    })
+    arredondar(container, 8)
+    criar("UIStroke", {
+        Color = CONFIG.COR_PRIMARIA,
+        Thickness = 1,
+        Transparency = 0.85,
+        Parent = container,
+    })
+
+    criar("TextLabel", {
+        Size = UDim2.new(0.7, 0, 0, 18),
+        Position = UDim2.new(0, 12, 0, 4),
+        BackgroundTransparency = 1,
+        Text = nome,
+        TextColor3 = CONFIG.COR_TEXTO,
+        Font = CONFIG.FONTE,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = container,
+        ZIndex = 8,
+    })
+
+    local valorLabel = criar("TextLabel", {
+        Size = UDim2.new(0.25, 0, 0, 18),
+        Position = UDim2.new(0.7, 0, 0, 4),
+        BackgroundTransparency = 1,
+        Text = tostring(padrao),
+        TextColor3 = CONFIG.COR_PRIMARIA,
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = container,
+        ZIndex = 8,
+    })
+
+    local barBg = criar("Frame", {
+        Size = UDim2.new(1, -24, 0, 6),
+        Position = UDim2.new(0, 12, 0, 32),
+        BackgroundColor3 = CONFIG.COR_FUNDO,
+        BorderSizePixel = 0,
+        Parent = container,
+        ZIndex = 8,
+    })
+    arredondar(barBg, 3)
+
+    local fill = criar("Frame", {
+        Size = UDim2.new((padrao - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = CONFIG.COR_PRIMARIA,
+        BorderSizePixel = 0,
+        Parent = barBg,
+        ZIndex = 8,
+    })
+    arredondar(fill, 3)
+    gradiente(fill, CONFIG.COR_PRIMARIA, CONFIG.COR_SECUNDARIA, 0)
+
+    local knob = criar("Frame", {
+        Size = UDim2.new(0, 14, 0, 14),
+        Position = UDim2.new((padrao - min) / (max - min), -7, 0.5, -7),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+        Parent = barBg,
+        ZIndex = 9,
+    })
+    arredondar(knob, 7)
+
+    local dragging = false
+    local btn = criar("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        Parent = barBg,
+        ZIndex = 10,
+    })
+
+    local function update(input)
+        local pos = math.clamp((input.Position.X - barBg.AbsolutePosition.X) / barBg.AbsoluteSize.X, 0, 1)
+        local val = math.floor(min + (max - min) * pos)
+        valorLabel.Text = tostring(val)
+        TweenService:Create(fill, TweenInfo.new(0.05), {Size = UDim2.new(pos, 0, 1, 0)}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.05), {Position = UDim2.new(pos, -7, 0.5, -7)}):Play()
+        if callback then callback(val) end
+    end
+
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            update(input)
+        end
+    end)
+    btn.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    return container
+end
+
+--// FUNÇÃO BOTÃO
+local function criarBotao(parent, nome, callback)
+    local btn = criar("TextButton", {
+        Size = UDim2.new(1, -6, 0, 36),
+        BackgroundColor3 = CONFIG.COR_PAINEL,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0,
+        Text = nome,
+        TextColor3 = CONFIG.COR_TEXTO,
+        Font = CONFIG.FONTE,
+        TextSize = 12,
+        LayoutOrder = #parent:GetChildren(),
+        Parent = parent,
+        AutoButtonColor = false,
+        ZIndex = 7,
+    })
+    arredondar(btn, 8)
+    criar("UIStroke", {
+        Color = CONFIG.COR_PRIMARIA,
+        Thickness = 1,
+        Transparency = 0.7,
+        Parent = btn,
+    })
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CONFIG.COR_PRIMARIA}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CONFIG.COR_PAINEL}):Play()
+    end)
+    btn.MouseButton1Click:Connect(function()
+        if callback then callback() end
+    end)
+
+    return btn
+end
+
+--// FUNÇÃO DROPDOWN (NOVO)
+local function criarDropdown(parent, nome, opcoes, padrao, callback)
+    local aberto = false
+    local selecionado = padrao
+
+    local container = criar("Frame", {
+        Size = UDim2.new(1, -6, 0, 46),
+        BackgroundColor3 = CONFIG.COR_PAINEL,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0,
+        LayoutOrder = #parent:GetChildren(),
+        Parent = parent,
+        ZIndex = 7,
+        ClipsDescendants = false,
+    })
+    arredondar(container, 8)
+    criar("UIStroke", {
+        Color = CONFIG.COR_PRIMARIA,
+        Thickness = 1,
+        Transparency = 0.85,
+        Parent = container,
+    })
+
+    criar("TextLabel", {
+        Size = UDim2.new(0.7, 0, 0, 18),
+        Position = UDim2.new(0, 12, 0, 6),
+        BackgroundTransparency = 1,
+        Text = nome,
+        TextColor3 = CONFIG.COR_TEXTO,
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = container,
+        ZIndex = 8,
+    })
+
+    local valorBtn = criar("TextButton", {
+        Size = UDim2.new(0.6, 0, 0, 22),
+        Position = UDim2.new(0, 12, 0, 20),
+        BackgroundColor3 = CONFIG.COR_FUNDO,
+        BorderSizePixel = 0,
+        Text = " " .. selecionado .. "  ▾",
+        TextColor3 = CONFIG.COR_PRIMARIA,
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = container,
+        AutoButtonColor = false,
+        ZIndex = 8,
+    })
+    arredondar(valorBtn, 6)
+    criar("UIStroke", {
+        Color = CONFIG.COR_PRIMARIA,
+        Thickness = 1,
+        Transparency = 0.5,
+        Parent = valorBtn,
+    })
+    criar("UIPadding", {
+        PaddingLeft = UDim.new(0, 8),
+        Parent = valorBtn,
+    })
+
+    local lista = criar("ScrollingFrame", {
+        Size = UDim2.new(0, 200, 0, math.min(#opcoes * 24 + 6, 130)),
+        Position = UDim2.new(0, 12, 1, 4),
+        BackgroundColor3 = CONFIG.COR_FUNDO,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = CONFIG.COR_PRIMARIA,
+        CanvasSize = UDim2.new(0, 0, 0, #opcoes * 24),
+        Parent = container,
+        Visible = false,
+        ZIndex = 15,
+    })
+    arredondar(lista, 6)
+    criar("UIStroke", {
+        Color = CONFIG.COR_PRIMARIA,
+        Thickness = 1,
+        Transparency = 0.3,
+        Parent = lista,
+    })
+    criar("UIListLayout", {
+        Padding = UDim.new(0, 2),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = lista,
+    })
+    criar("UIPadding", {
+        PaddingTop = UDim.new(0, 4),
+        PaddingLeft = UDim.new(0, 4),
+        PaddingRight = UDim.new(0, 4),
+        Parent = lista,
+    })
+
+    for _, opcao in ipairs(opcoes) do
+        local optBtn = criar("TextButton", {
+            Size = UDim2.new(1, -4, 0, 22),
+            BackgroundColor3 = CONFIG.COR_PAINEL,
+            BackgroundTransparency = 0.3,
+            BorderSizePixel = 0,
+            Text = opcao,
+            TextColor3 = CONFIG.COR_TEXTO,
+            Font = CONFIG.FONTE,
+            TextSize = 11,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            LayoutOrder = 1,
+            Parent = lista,
+            AutoButtonColor = false,
+            ZIndex = 16,
+        })
+        arredondar(optBtn, 4)
+        criar("UIPadding", {
+            PaddingLeft = UDim.new(0, 8),
+            Parent = optBtn,
+        })
+
+        optBtn.MouseEnter:Connect(function()
+            TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.COR_PRIMARIA, BackgroundTransparency = 0}):Play()
+        end)
+        optBtn.MouseLeave:Connect(function()
+            TweenService:Create(optBtn, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.COR_PAINEL, BackgroundTransparency = 0.3}):Play()
+        end)
+
+        optBtn.MouseButton1Click:Connect(function()
+            selecionado = opcao
+            valorBtn.Text = " " .. selecionado .. "  ▾"
+            lista.Visible = false
+            aberto = false
+            if callback then callback(selecionado) end
+        end)
+    end
+
+    valorBtn.MouseButton1Click:Connect(function()
+        aberto = not aberto
+        lista.Visible = aberto
+    end)
+
+    container.Size = UDim2.new(1, -6, 0, 46)
+
+    return container
+end
