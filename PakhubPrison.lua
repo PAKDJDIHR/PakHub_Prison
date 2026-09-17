@@ -892,3 +892,302 @@ local function criarDropdown(parent, nome, opcoes, padrao, callback)
 
     return container
 end
+--// CONSTRUÇÃO DAS PÁGINAS
+
+-- PÁGINA: COMBAT
+local pageCombat = criarCategoria("COMBAT", "⚔")
+criarToggle(pageCombat, "Silent Aimbot", "Balas vão no alvo sem mexer a câmera", function(v) State.SilentAimbot = v end)
+criarSlider(pageCombat, "Aimbot FOV", 30, 500, 120, function(v) State.AimbotFOV = v end)
+criarToggle(pageCombat, "Verificar Paredes", "Aimbot só atira se estiver visível", function(v) State.VerificarParedes = v end)
+criarToggle(pageCombat, "Ignorar Corpos", "Não mira em jogadores mortos", function(v) State.IgnorarCorpos = v end)
+criarDropdown(pageCombat, "Ignorar Time", TIMES_PRISON, "None", function(v) State.IgnorarTime = v end)
+criarDropdown(pageCombat, "Focar Time", TIMES_PRISON, "None", function(v) State.FocarTime = v end)
+criarToggle(pageCombat, "Mostrar FOV Circle", "Círculo fixo no centro da tela", function(v) State.MostrarFOV = v end)
+
+-- PÁGINA: VISUALS
+local pageVisuals = criarCategoria("VISUALS", "👁")
+criarToggle(pageVisuals, "ESP Geral", "Liga/desliga todos os ESP", function(v) State.ESP = v end)
+criarToggle(pageVisuals, "Caixas / Box", "Caixa ao redor do jogador", function(v) State.Box = v end)
+criarToggle(pageVisuals, "Linhas (ESP Lines)", "Linhas do centro da tela até o jogador", function(v) State.Lines = v end)
+criarToggle(pageVisuals, "Mostrar Nomes", "Nome do jogador acima", function(v) State.Name = v end)
+criarToggle(pageVisuals, "Mostrar Distância", "Distância em metros", function(v) State.Distance = v end)
+criarToggle(pageVisuals, "Mostrar Vida", "Barra de vida colorida", function(v) State.Health = v end)
+
+-- PÁGINA: MOVEMENT
+local pageMovement = criarCategoria("MOVEMENT", "🏃")
+criarToggle(pageMovement, "Speed", "Aumenta a velocidade", function(v) State.Speed = v end)
+criarSlider(pageMovement, "Speed Value", 16, 200, 25, function(v) State.SpeedValue = v end)
+criarToggle(pageMovement, "Noclip", "Atravessar paredes", function(v) State.Noclip = v end)
+criarToggle(pageMovement, "Jump Infinito", "Pular sem parar", function(v) State.JumpInfinito = v end)
+criarToggle(pageMovement, "Spinbot", "Girar personagem", function(v) State.Spinbot = v end)
+criarSlider(pageMovement, "Spin Speed", 1, 50, 10, function(v) State.SpinSpeed = v end)
+
+-- PÁGINA: CRÉDITOS
+local pageCredits = criarCategoria("CRÉDITOS", "★")
+local credContainer = criar("Frame", {
+    Size = UDim2.new(1, -6, 0, 200),
+    BackgroundColor3 = CONFIG.COR_PAINEL,
+    BackgroundTransparency = 0.1,
+    BorderSizePixel = 0,
+    LayoutOrder = 1,
+    Parent = pageCredits,
+    ZIndex = 7,
+})
+arredondar(credContainer, 8)
+criar("UIStroke", {
+    Color = CONFIG.COR_PRIMARIA,
+    Thickness = 1,
+    Transparency = 0.7,
+    Parent = credContainer,
+})
+
+local avatar = criar("ImageLabel", {
+    Size = UDim2.new(0, 70, 0, 70),
+    Position = UDim2.new(0.5, -35, 0, 20),
+    BackgroundColor3 = CONFIG.COR_FUNDO,
+    BorderSizePixel = 0,
+    Parent = credContainer,
+    ZIndex = 8,
+})
+arredondar(avatar, 35)
+
+pcall(function()
+    local id = Players:GetUserIdFromNameAsync(CONFIG.CRIADOR)
+    local thumb = Players:GetUserThumbnailAsync(id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    avatar.Image = thumb
+end)
+
+criar("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 25),
+    Position = UDim2.new(0, 0, 0, 100),
+    BackgroundTransparency = 1,
+    Text = CONFIG.CRIADOR,
+    TextColor3 = CONFIG.COR_TEXTO,
+    Font = CONFIG.FONTE_BOLD,
+    TextSize = 16,
+    Parent = credContainer,
+    ZIndex = 8,
+})
+criar("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 20),
+    Position = UDim2.new(0, 0, 0, 125),
+    BackgroundTransparency = 1,
+    Text = "Criador do PAK HUB PRISON",
+    TextColor3 = CONFIG.COR_SUBTEXTO,
+    Font = CONFIG.FONTE,
+    TextSize = 11,
+    Parent = credContainer,
+    ZIndex = 8,
+})
+criar("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 25),
+    Position = UDim2.new(0, 0, 0, 155),
+    BackgroundTransparency = 1,
+    Text = "Obrigado por usar!",
+    TextColor3 = CONFIG.COR_PRIMARIA,
+    Font = CONFIG.FONTE_BOLD,
+    TextSize = 13,
+    Parent = credContainer,
+    ZIndex = 8,
+})
+
+-- Abrir primeira página automaticamente
+task.wait(0.1)
+if SidebarButtons["COMBAT"] then
+    for n, p in pairs(Pages) do p.Visible = false end
+    Pages["COMBAT"].Visible = true
+    TweenService:Create(SidebarButtons["COMBAT"].btn, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.COR_PRIMARIA}):Play()
+    SidebarButtons["COMBAT"].icon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SidebarButtons["COMBAT"].label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    pageTitle.Text = "COMBAT"
+    CurrentPage = "COMBAT"
+end
+
+--// MENSAGEM DE BOAS-VINDAS
+local function mostrarBoasVindas()
+    local welcome = criar("Frame", {
+        Size = UDim2.new(0, 300, 0, 70),
+        Position = UDim2.new(0.5, -150, 0, -80),
+        BackgroundColor3 = CONFIG.COR_PAINEL,
+        BorderSizePixel = 0,
+        Parent = ScreenGui,
+        ZIndex = 20,
+    })
+    arredondar(welcome, 12)
+    gradiente(welcome, CONFIG.COR_PAINEL, CONFIG.COR_FUNDO, 135)
+    sombra(welcome)
+
+    criar("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 30),
+        Position = UDim2.new(0, 0, 0, 8),
+        BackgroundTransparency = 1,
+        Text = "Bem-vindo à prisão",
+        TextColor3 = CONFIG.COR_PRIMARIA,
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 15,
+        Parent = welcome,
+        ZIndex = 21,
+    })
+    criar("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 25),
+        Position = UDim2.new(0, 0, 0, 36),
+        BackgroundTransparency = 1,
+        Text = "E aí, " .. LocalPlayer.Name .. "!",
+        TextColor3 = CONFIG.COR_TEXTO,
+        Font = CONFIG.FONTE,
+        TextSize = 13,
+        Parent = welcome,
+        ZIndex = 21,
+    })
+
+    TweenService:Create(welcome, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, -150, 0, 20)
+    }):Play()
+
+    task.wait(3.5)
+    local out = TweenService:Create(welcome, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Position = UDim2.new(0.5, -150, 0, -80),
+        BackgroundTransparency = 1
+    })
+    out:Play()
+    for _, v in pairs(welcome:GetDescendants()) do
+        if v:IsA("TextLabel") then
+            TweenService:Create(v, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+        end
+    end
+    out.Completed:Connect(function() welcome:Destroy() end)
+end
+
+--// DRAG
+local function makeDraggable(frame, handle)
+    local dragging, dragStart, startPos
+    handle = handle or frame
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+
+    handle.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+makeDraggable(Hub, hubTopBar)
+makeDraggable(KeyScreen, KeyScreen)
+makeDraggable(FloatingBall)
+
+--// VERIFICAÇÃO DA KEY
+confirmBtn.MouseButton1Click:Connect(function()
+    if keyBox.Text == CONFIG.KEY_CORRETA then
+        local out = TweenService:Create(KeyScreen, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Position = UDim2.new(0.5, -170, 0.5, 400),
+            BackgroundTransparency = 1
+        })
+        out:Play()
+        for _, v in pairs(KeyScreen:GetDescendants()) do
+            if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
+                TweenService:Create(v, TweenInfo.new(0.4), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+            end
+        end
+        out.Completed:Connect(function()
+            KeyScreen:Destroy()
+            Hub.Visible = true
+            Hub.Position = UDim2.new(0.5, -260, 0.5, 300)
+            TweenService:Create(Hub, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0.5, -260, 0.5, -180)
+            }):Play()
+            mostrarBoasVindas()
+        end)
+    else
+        errorLabel.Text = "✗ Key inválida. Tente novamente."
+        keyStroke.Color = Color3.fromRGB(255, 60, 60)
+        TweenService:Create(keyBox, TweenInfo.new(0.1), {Position = UDim2.new(0.5, -135, 0, 110)}):Play()
+        task.wait(0.1)
+        TweenService:Create(keyBox, TweenInfo.new(0.1), {Position = UDim2.new(0.5, -125, 0, 110)}):Play()
+        task.wait(0.1)
+        TweenService:Create(keyBox, TweenInfo.new(0.1), {Position = UDim2.new(0.5, -130, 0, 110)}):Play()
+        task.wait(0.5)
+        keyStroke.Color = CONFIG.COR_PRIMARIA
+        errorLabel.Text = ""
+    end
+end)
+
+--// MINIMIZAR / RESTAURAR
+minimBtn.MouseButton1Click:Connect(function()
+    Hub.Visible = false
+    FloatingBall.Visible = true
+end)
+
+FloatingBall.MouseButton1Click:Connect(function()
+    FloatingBall.Visible = false
+    Hub.Visible = true
+end)
+
+--// FECHAR
+closeBtn.MouseButton1Click:Connect(function()
+    Hub.Visible = false
+    FloatingBall.Visible = true
+    local confirm = criar("Frame", {
+        Size = UDim2.new(0, 220, 0, 100),
+        Position = UDim2.new(0.5, -110, 0.5, -50),
+        BackgroundColor3 = CONFIG.COR_PAINEL,
+        BorderSizePixel = 0,
+        Parent = ScreenGui,
+        ZIndex = 30,
+    })
+    arredondar(confirm, 12)
+    sombra(confirm)
+
+    criar("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 35),
+        Position = UDim2.new(0, 0, 0, 8),
+        BackgroundTransparency = 1,
+        Text = "Deseja realmente fechar?",
+        TextColor3 = CONFIG.COR_TEXTO,
+        Font = CONFIG.FONTE,
+        TextSize = 13,
+        Parent = confirm,
+        ZIndex = 31,
+    })
+
+    local sim = criar("TextButton", {
+        Size = UDim2.new(0, 90, 0, 32),
+        Position = UDim2.new(0, 15, 0, 55),
+        BackgroundColor3 = Color3.fromRGB(200, 40, 40),
+        BorderSizePixel = 0,
+        Text = "SIM",
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 12,
+        Parent = confirm,
+        ZIndex = 31,
+    })
+    arredondar(sim, 8)
+
+    local nao = criar("TextButton", {
+        Size = UDim2.new(0, 90, 0, 32),
+        Position = UDim2.new(1, -105, 0, 55),
+        BackgroundColor3 = CONFIG.COR_PRIMARIA,
+        BorderSizePixel = 0,
+        Text = "NÃO",
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = CONFIG.FONTE_BOLD,
+        TextSize = 12,
+        Parent = confirm,
+        ZIndex = 31,
+    })
+    arredondar(nao, 8)
+
+    sim.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+    nao.MouseButton1Click:Connect(function() confirm:Destroy() end)
+end)
