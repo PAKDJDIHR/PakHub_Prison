@@ -1191,3 +1191,399 @@ closeBtn.MouseButton1Click:Connect(function()
     sim.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
     nao.MouseButton1Click:Connect(function() confirm:Destroy() end)
 end)
+--// MÓDULO ESP
+local espObjects = {}
+
+local function criarESP(player)
+    if player == LocalPlayer then return end
+    if espObjects[player] then return end
+
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Color = CONFIG.COR_PRIMARIA
+    box.Filled = false
+    box.Transparency = 1
+    box.Visible = false
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Size = 14
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Color = Color3.fromRGB(255, 255, 255)
+    nameTag.Visible = false
+
+    local distTag = Drawing.new("Text")
+    distTag.Size = 12
+    distTag.Center = true
+    distTag.Outline = true
+    distTag.Color = Color3.fromRGB(200, 200, 200)
+    distTag.Visible = false
+
+    local healthBar = Drawing.new("Line")
+    healthBar.Thickness = 2
+    healthBar.Color = Color3.fromRGB(0, 255, 0)
+    healthBar.Visible = false
+
+    local line = Drawing.new("Line")
+    line.Thickness = 1
+    line.Color = CONFIG.COR_PRIMARIA
+    line.Visible = false
+
+    espObjects[player] = { box = box, name = nameTag, dist = distTag, health = healthBar, line = line }
+end
+
+local function removerESP(player)
+    if espObjects[player] then
+        for _, obj in pairs(espObjects[player]) do
+            pcall(function() obj:Remove() end)
+        end
+        espObjects[player] = nil
+    end
+end
+
+Players.PlayerAdded:Connect(criarESP)
+Players.PlayerRemoving:Connect(removerESP)
+for _, p in pairs(Players:GetPlayers()) do criarESP(p) end
+
+--// FOV CIRCLE (FIXO NO CENTRO DA TELA)
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1.5
+fovCircle.Color = CONFIG.COR_PRIMARIA
+fovCircle.Filled = false
+fovCircle.Transparency = 0.7
+fovCircle.NumSides = 60
+fovCircle.Radius = State.AimbotFOV
+fovCircle.Visible = false
+
+--// FUNÇÃO VERIFICAR PAREDES
+local function temParedeNaFrente(char)
+    if not char or not char:FindFirstChild("Head") then return true end
+    local head = char.Head
+    local origem = Camera.CFrame.Position
+    local direcao = head.Position - origem
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {char, LocalPlayer.Character, Camera}
+
+    local ray = workspace:Raycast(origem, direcao, params)
+    return ray ~= nil
+end
+
+--// FUNÇÃO: verificar se jogador está morto
+local function estaMorto(player)
+    if not player or not player.Character then return true end
+    local char = player.Character
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return true end
+    if humanoid.Health <= 0 then return true end
+    if not char:FindFirstChild("HumanoidRootPart") then return true end
+    local estado = humanoid:GetState()
+    if estado == Enum.HumanoidStateType.Dead 
+    or estado == Enum.HumanoidStateType.Physics 
+    or estado == Enum.HumanoidStateType.FallingDown then
+        return true
+    end
+    return false
+end
+
+--// FUNÇÃO: verifica se é do time alvo do filtro
+local function timeCorresponde(player, nomeTime)
+    if not player or not player.Team then return false end
+    return player.Team.Name == nomeTime
+end
+
+--// FUNÇÃO COMBINADA: DEVE IGNORAR ESTE JOGADOR?
+local function deveIgnorar(player)
+    -- Ignora corpos se ativado
+    if State.IgnorarCorpos and estaMorto(player) then 
+        return true 
+    end
+    
+    -- Ignora time específico
+    if State.IgnorarTime ~= "None" and timeCorresponde(player, State.IgnorarTime) then
+        return true
+    end
+    
+    -- Focar time: se ativado, ignora todos os outros
+    if State.FocarTime ~= "None" then
+        if not timeCorresponde(player, State.FocarTime) then
+            return true
+        end
+    end
+    
+    return false
+end
+
+--// [SILENT AIM] VARIÁVEIS GLOBAIS
+local silentTarget = nil -- alvo travado no frame atual
+local silentEnabled = false
+
+--// [SILENT AIM] Função que acha o alvo mais próximo (retorna o Head)
+local function acharAlvoSilent()
+    local centroTela = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local closest, closestDist = nil, State.AimbotFOV
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            if not deveIgnorar(player) then
+                local char = player.Character
+                local head = char.Head
+
+                local bloqueado = false
+                if State.VerificarParedes then
+                    bloqueado = temParedeNaFrente(char)
+                end
+
+                if not bloqueado then
+                    local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(pos.X, pos.Y) - centroTela).Magnitude
+                        if dist < closestDist then
+                            closestDist = dist
+                            closest = head
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+--// [SILENT AIM] Hook no Namecall — redireciona tiros sem mexer a câmera
+-- Funciona interceptando chamadas de arma que usam Ray/FindPartOnRay
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- Silent Aim ativo + tem alvo + é uma chamada de tiro
+    if State.SilentAimbot and silentTarget and silentTarget.Parent then
+        -- Detecta métodos comuns de armas (Ray, FindPartOnRay, etc)
+        if method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
+            local ray = args[1]
+            if typeof(ray) == "Ray" then
+                -- Redireciona o ray para o alvo
+                local novoTarget = silentTarget.Position
+                local novaOrigem = Camera.CFrame.Position
+                local novaDirecao = (novoTarget - novaOrigem).Unit * ray.Direction.Magnitude
+                args[1] = Ray.new(novaOrigem, novaDirecao)
+                return oldNamecall(self, unpack(args))
+            end
+        end
+        -- Alguns jogos usam Raycast direto
+        if method == "Raycast" then
+            local origem = args[1]
+            local direcao = args[2]
+            if typeof(origem) == "Vector3" and typeof(direcao) == "Vector3" then
+                local novoTarget = silentTarget.Position
+                local novaOrigem = Camera.CFrame.Position
+                local novaDirecao = (novoTarget - novaOrigem).Unit * direcao.Magnitude
+                args[1] = novaOrigem
+                args[2] = novaDirecao
+                return oldNamecall(self, unpack(args))
+            end
+        end
+    end
+
+    return oldNamecall(self, ...)
+end)
+
+--// [SILENT AIM] Também intercepta o clique para redirecionar a mira da arma
+-- Caso o jogo use Mouse.Hit / Mouse.Target para atirar
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, key)
+    -- Intercepta Mouse.Hit (alguns jogos usam para mirar)
+    if State.SilentAimbot and silentTarget and silentTarget.Parent and self == Mouse then
+        if key == "Hit" then
+            return CFrame.new(silentTarget.Position)
+        end
+        if key == "Target" then
+            return silentTarget
+        end
+        if key == "UnitRay" then
+            local origem = Camera.CFrame.Position
+            local direcao = (silentTarget.Position - origem).Unit
+            return Ray.new(origem, direcao * 5000)
+        end
+    end
+    return oldIndex(self, key)
+end)
+
+setreadonly(mt, true)
+
+--// JUMP INFINITO - conexão de estado
+local jumpConn = nil
+local function ativarJumpInfinito(ativo)
+    if jumpConn then
+        jumpConn:Disconnect()
+        jumpConn = nil
+    end
+    
+    if not ativo then return end
+    
+    local function conectar(char)
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        
+        jumpConn = hum.StateChanged:Connect(function(_, newState)
+            if newState == Enum.HumanoidStateType.Landed or newState == Enum.HumanoidStateType.Running then
+                if State.JumpInfinito and hum.Health > 0 then
+                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end
+        end)
+    end
+    
+    if LocalPlayer.Character then
+        conectar(LocalPlayer.Character)
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        if State.JumpInfinito then
+            task.wait(0.5)
+            conectar(char)
+        end
+    end)
+end
+
+-- Reconecta quando ativar
+local jumpToggleConn
+local oldJumpState = false
+
+--// LOOP PRINCIPAL
+RunService.RenderStepped:Connect(function()
+    -- Reativa o Jump Infinito quando o toggle muda
+    if State.JumpInfinito ~= oldJumpState then
+        oldJumpState = State.JumpInfinito
+        ativarJumpInfinito(State.JumpInfinito)
+    end
+
+    -- FOV CIRCLE (fixo no centro da tela)
+    if State.MostrarFOV and State.SilentAimbot then
+        fovCircle.Visible = true
+        fovCircle.Radius = State.AimbotFOV
+        fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    else
+        fovCircle.Visible = false
+    end
+
+    -- [SILENT AIM] Atualiza o alvo a cada frame (sem mexer a câmera)
+    if State.SilentAimbot then
+        silentTarget = acharAlvoSilent()
+        silentEnabled = silentTarget ~= nil
+    else
+        silentTarget = nil
+        silentEnabled = false
+    end
+
+    -- ESP
+    for player, obj in pairs(espObjects) do
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+            local hrp = char.HumanoidRootPart
+            local hum = char.Humanoid
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+            if onScreen and State.ESP then
+                local head = char:FindFirstChild("Head")
+                if head then
+                    local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                    local footPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                    local height = math.abs(headPos.Y - footPos.Y)
+                    local width = height / 2
+
+                    if State.Box then
+                        obj.box.Visible = true
+                        obj.box.Size = Vector2.new(width, height)
+                        obj.box.Position = Vector2.new(pos.X - width/2, pos.Y - height/2)
+                    else
+                        obj.box.Visible = false
+                    end
+
+                    if State.Name then
+                        obj.name.Visible = true
+                        obj.name.Text = player.Name
+                        obj.name.Position = Vector2.new(pos.X, pos.Y - height/2 - 18)
+                    else
+                        obj.name.Visible = false
+                    end
+
+                    if State.Distance then
+                        obj.dist.Visible = true
+                        local dist = math.floor((hrp.Position - Camera.CFrame.Position).Magnitude)
+                        obj.dist.Text = tostring(dist) .. "m"
+                        obj.dist.Position = Vector2.new(pos.X, pos.Y + height/2 + 4)
+                    else
+                        obj.dist.Visible = false
+                    end
+
+                    if State.Health then
+                        obj.health.Visible = true
+                        local hp = hum.Health / hum.MaxHealth
+                        local barX = pos.X - width/2 - 8
+                        obj.health.From = Vector2.new(barX, pos.Y + height/2)
+                        obj.health.To = Vector2.new(barX, pos.Y + height/2 - (height * hp))
+                        obj.health.Color = Color3.fromRGB(255 * (1 - hp), 255 * hp, 0)
+                    else
+                        obj.health.Visible = false
+                    end
+
+                    if State.Lines then
+                        obj.line.Visible = true
+                        obj.line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        obj.line.To = Vector2.new(pos.X, pos.Y + height/2)
+                    else
+                        obj.line.Visible = false
+                    end
+                end
+            else
+                obj.box.Visible = false
+                obj.name.Visible = false
+                obj.dist.Visible = false
+                obj.health.Visible = false
+                obj.line.Visible = false
+            end
+        end
+    end
+
+    -- SPEED
+    if State.Speed then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = State.SpeedValue
+        end
+    end
+
+    -- NOCLIP
+    if State.Noclip then
+        local char = LocalPlayer.Character
+        if char then
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.CanCollide then
+                    v.CanCollide = false
+                end
+            end
+        end
+    end
+
+    -- SPINBOT
+    if State.Spinbot then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(State.SpinSpeed), 0)
+        end
+    end
+end)
+
+StarterGui:SetCore("SendNotification", {
+    Title = "PAK HUB PRISON",
+    Text = "Script carregado! Key: PakPrison",
+    Duration = 4,
+})
